@@ -1,0 +1,59 @@
+version: '3.8'
+services:
+
+#Postgres database
+  db:
+    image: postgres
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=stock_market
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    container_name: postgres_db
+
+  #Django application
+  django-app: 
+    build: .
+    volumes:
+      - .:/django
+    ports:
+      - 8000:8000
+    image: django-app:django
+    container_name: django_container
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      - name=value
+    depends_on:
+      - db
+
+  #Redis
+  redis:
+    image: redis:alpine
+    container_name: redis
+
+  #Celery
+  celery-beat:
+    restart: always
+    build: 
+      context: .
+    command: celery -A stock_market beat --loglevel=info
+    volumes:
+      - .:/django
+    depends_on:
+      - db
+      - django-app
+      - redis
+    container_name: celery-beat
+
+  celery-worker:
+    build:
+      context: .
+    command: celery -A stock_market worker --loglevel=info
+    volumes:
+      - .:/django
+    depends_on:
+      - celery-beat
+      - redis
+      - django-app
+      - db
