@@ -1,10 +1,14 @@
+from time import time
 from django.http import HttpResponse
 from django.shortcuts import render
+from django.utils import timezone
 from core.models import Stock
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
+from rest_framework.pagination import PageNumberPagination
 import finnhub
-import datetime
+import pytz
+from datetime import datetime
 from .serializers import StockSerializer
 
 # Create your views here.
@@ -22,7 +26,19 @@ def fetch_current_data(request):
     stocks = Stock.objects.order_by('-id')[:10]
     serialized_stocks = StockSerializer(stocks, many=True)
     return Response(serialized_stocks.data)
-    
+
+@api_view(['GET'])
 def history(request, symbol):
-    stocks = Stock.objects.filter(symbol=symbol)
-    return render(request, 'core/index.html', {'stocks':stocks, 'string':symbol})
+    
+    tz = pytz.timezone('Asia/Almaty')
+    from_date = request.GET.get('from')
+    to_date = request.GET.get('to')
+    from_date_datetime = timezone.make_aware(datetime.strptime(from_date, '%Y-%m-%dT%H:%M:%S'), tz)
+    to_date_datetime = timezone.make_aware(datetime.strptime(to_date, '%Y-%m-%dT%H:%M:%S'), tz)
+    stocks = Stock.objects.filter(time__range=[from_date_datetime, to_date_datetime], symbol=symbol)
+    paginator = PageNumberPagination()
+    paginator.page_size = 1
+    pages = paginator.paginate_queryset(stocks, request)
+    serialized_stocks = StockSerializer(pages, many=True)
+
+    return paginator.get_paginated_response(serialized_stocks.data)
