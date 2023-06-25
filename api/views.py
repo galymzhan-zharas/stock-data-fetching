@@ -6,10 +6,14 @@ from core.models import Stock
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.pagination import PageNumberPagination
-import finnhub
-import pytz
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from datetime import datetime
 from .serializers import StockSerializer
+import finnhub
+import pytz
+
 
 # Create your views here.
 
@@ -22,14 +26,20 @@ from .serializers import StockSerializer
 
 
 @api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated]) 
 def fetch_current_data(request):
+
     stocks = Stock.objects.order_by('-id')[:10]
     serialized_stocks = StockSerializer(stocks, many=True)
+    
     return Response(serialized_stocks.data)
 
 @api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated]) 
 def history(request, symbol):
-    
+
     tz = pytz.timezone('Asia/Almaty')
     from_date = request.GET.get('from')
     to_date = request.GET.get('to')
@@ -41,4 +51,4 @@ def history(request, symbol):
     pages = paginator.paginate_queryset(stocks, request)
     serialized_stocks = StockSerializer(pages, many=True)
 
-    return paginator.get_paginated_response(serialized_stocks.data)
+    return paginator.get_paginated_response(serialized_stocks.data) 
